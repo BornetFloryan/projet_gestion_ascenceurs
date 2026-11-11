@@ -1,21 +1,35 @@
 CC = gcc
-CFLAGS = -Wall -Wextra -Iinclude -pthread -std=c11
-SRC = src/main.c src/communication.c src/ascenseur.c src/utilisateur.c src/gestionnaire.c
-OBJ = $(SRC:.c=.o)
-EXEC = gestion-ascenseurs
+CPPFLAGS = -Iinclude
+CFLAGS = -std=c11 -O2 -Wall -Wextra -Wpedantic -pthread
+LDFLAGS = -pthread -lrt
 
-all: $(EXEC)
+SOURCES = src/main.c src/communication.c src/synchronisation.c \
+          src/immeuble.c src/ordonnancement.c src/utilisateur.c \
+          src/ascenseur.c src/gestionnaire.c src/alertes.c \
+          src/scenario.c src/statistiques.c
+BUILD_DIR = build
+OBJECTS = $(SOURCES:src/%.c=$(BUILD_DIR)/%.o)
+EXECUTABLE = gestion-ascenseurs
 
-$(EXEC): $(OBJ)
-	$(CC) $(CFLAGS) -o $@ $(OBJ)
+all: $(EXECUTABLE)
 
-src/%.o: src/%.c
-	$(CC) $(CFLAGS) -c $< -o $@
 
-run: $(EXEC)
-	./$(EXEC)
+$(EXECUTABLE): $(OBJECTS)
+	$(CC) $(OBJECTS) -o $@ $(LDFLAGS)
+
+
+$(BUILD_DIR)/%.o: src/%.c
+	@mkdir -p $(BUILD_DIR)
+	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
+
+run: $(EXECUTABLE)
+	./$(EXECUTABLE)
+
+help: $(EXECUTABLE)
+	./$(EXECUTABLE) -h
 
 clean:
-	rm -f $(OBJ) $(EXEC)
+	rm -rf $(BUILD_DIR) $(EXECUTABLE)
+	rm -f src/*.o
 
-.PHONY: all run clean
+.PHONY: all clean run help

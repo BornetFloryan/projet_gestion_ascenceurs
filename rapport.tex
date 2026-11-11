@@ -1,0 +1,312 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[french]{babel}
+\usepackage{lmodern}
+\usepackage{geometry}
+\geometry{margin=2.2cm}
+\usepackage{microtype}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{enumitem}
+\usepackage{listings}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,shapes.geometric,fit}
+\usepackage{hyperref}
+\usepackage{fancyhdr}
+\usepackage{lastpage}
+\usepackage{titlesec}
+
+\definecolor{bleu}{HTML}{17365D}
+\definecolor{bleuclair}{HTML}{EAF0F6}
+\definecolor{griscode}{HTML}{F3F5F7}
+\definecolor{vert}{HTML}{39765B}
+\hypersetup{colorlinks=true,linkcolor=bleu,urlcolor=bleu,citecolor=bleu,pdftitle={Projet SR70 - Gestion avancee d'un systeme d'ascenseurs}}
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{SR70 -- Gestion des ascenseurs}
+\rhead{Rapport de projet}
+\cfoot{Page \thepage{} / \pageref{LastPage}}
+\setlength{\headheight}{14pt}
+\titleformat{\section}{\Large\bfseries\color{bleu}}{\thesection}{0.7em}{}
+\titleformat{\subsection}{\large\bfseries\color{bleu}}{\thesubsection}{0.7em}{}
+\setlist[itemize]{itemsep=2pt,topsep=4pt}
+\setlist[enumerate]{itemsep=3pt,topsep=4pt}
+
+\lstdefinestyle{terminal}{
+  basicstyle=\ttfamily\small,
+  backgroundcolor=\color{griscode},
+  frame=single,
+  rulecolor=\color{bleu!25},
+  breaklines=true,
+  columns=fullflexible,
+  keepspaces=true,
+  showstringspaces=false
+}
+
+\begin{document}
+\hypersetup{pageanchor=false}
+\begin{titlepage}
+  \centering
+  \vspace*{1.2cm}
+  {\Large Universite de Technologie de Belfort-Montbeliard\par}
+  \vspace{2.0cm}
+  {\color{bleu}\rule{\textwidth}{1.2pt}}\par
+  \vspace{0.7cm}
+  {\Huge\bfseries\color{bleu} PROJET SR70\par}
+  \vspace{0.5cm}
+  {\LARGE Gestion avancee d'un systeme d'ascenseurs\par}
+  \vspace{0.6cm}
+  {\large Simulation en langage C de deux ascenseurs dans un immeuble de onze niveaux\par}
+  \vspace{0.7cm}
+  {\color{bleu}\rule{\textwidth}{1.2pt}}\par
+  \vspace{2.1cm}
+  \begin{tabular}{>{\bfseries}p{4cm}p{8cm}}
+    Membres & Floryan BORNET\\
+             & Tim CARRARA\\
+             & Enzo VIDY\\[0.35cm]
+  \end{tabular}
+  \vfill
+  {\large Annee universitaire : 2026-2027\par}
+\end{titlepage}
+\hypersetup{pageanchor=true}
+
+\tableofcontents
+\newpage
+
+\section{Presentation du sujet et objectifs}
+
+Le sujet consiste a developper une simulation avancee d'un systeme de gestion de deux ascenseurs pour un immeuble de bureaux de dix etages, auquel s'ajoute un niveau d'entree numerote 0. Les ascenseurs doivent repondre aux demandes des usagers, limiter les temps d'attente et communiquer au moyen de mecanismes de programmation systeme.
+
+Le projet a deux objectifs complementaires. Le premier est fonctionnel : simuler l'arrivee des appels, la selection d'un ascenseur et les deplacements entre les niveaux 0 et 10. Le second est pedagogique : mettre en oeuvre plusieurs mecanismes Linux et etre capable de justifier leur utilisation, notamment les processus, les threads, les IPC et la synchronisation.
+
+\subsection{Perimetre retenu}
+
+Le programme fonctionne dans un terminal Linux. Les demandes peuvent etre generees automatiquement ou saisies dans une console interactive. Le nombre d'usagers, le delai entre les demandes, la graine aleatoire, la probabilite de panne, la duree de reparation et la capacite d'affectation peuvent etre configures en ligne de commande.
+
+\section{Fonctionnalites realisees}
+
+Le tableau suivant distingue les fonctionnalites effectivement implementees des idees volontairement laissees comme evolutions.
+
+\begin{longtable}{p{3.6cm}p{10.8cm}}
+\toprule
+\textbf{Fonctionnalite} & \textbf{Implementation dans le projet}\\
+\midrule
+\endhead
+Modelisation de l'immeuble & Structures \texttt{Immeuble} et \texttt{Etage}, avec onze niveaux numerotes de 0 a 10 et des espaces nommes : accueil, services, cafeteria, salle de reunion et direction.\\
+Simulation de frequentation & Creation de threads POSIX. Chaque thread construit une demande aleatoire avec un depart, une destination differente et une priorite. Les creations sont espacees pour simuler un flux d'appels.\\
+Deux ascenseurs & Deux processus fils independants crees avec \texttt{fork()}. Chaque processus execute la boucle de son ascenseur.\\
+Gestion des appels & Un thread gestionnaire recoit les demandes, les place dans une file d'attente et les transmet aux ascenseurs par messages.\\
+Optimisation & Heuristique de cout integrant la distance jusqu'au depart, la charge deja affectee, le trajet restant et la coherence du sens de deplacement.\\
+Priorites & Trois niveaux : normale, prioritaire et urgente. A priorite egale, les demandes les plus anciennes sont traitees d'abord.\\
+Communication & Files de messages System V pour les appels, les commandes et les confirmations.\\
+Synchronisation & Semaphore POSIX partage entre processus pour proteger l'etat partage et synchroniser les evenements. Des mutex pthread protegent les donnees partagees entre threads du processus principal.\\
+Pannes & En mode automatique, une panne peut etre tiree aleatoirement. En mode interactif, elle peut etre declenchee manuellement. Une demande interrompue est remise en attente apres une alerte.\\
+Statistiques & Export CSV distinct par execution dans \texttt{resultats/}, avec priorite, ascenseur, depart, destination, attente, duree et nombre de tentatives.\\
+Signaux et arret & Prise en compte de \texttt{SIGINT} et \texttt{SIGTERM}, arret explicite des processus fils et liberation des ressources IPC.\\
+\bottomrule
+\end{longtable}
+
+Les demandes urgentes sont uniquement des categories de simulation. Le programme ne modelise pas de situation reelle ni de personne reelle. L'interface utilisateur est une interface en ligne de commande ; aucune interface graphique n'est necessaire pour demontrer les mecanismes systeme du projet.
+
+\section{Architecture generale}
+
+L'application est composee d'un processus principal, de deux processus ascenseurs, d'un thread gestionnaire et d'un thread par usager simule. Les ressources IPC sont creees avant les processus fils. Ce choix permet d'effectuer les appels a \texttt{fork()} avant de creer les threads, ce qui evite de forker un processus deja multithreade dans cette architecture.
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[
+  node distance=7mm and 9mm,
+  bloc/.style={draw=bleu,rounded corners,fill=bleuclair,align=center,minimum height=9mm,text width=4.1cm,font=\small},
+  petit/.style={draw=vert,rounded corners,fill=green!5,align=center,minimum height=8mm,text width=3.4cm,font=\small},
+  fleche/.style={-{Latex[length=2mm]},thick,draw=bleu}
+]
+\node[bloc] (main) {Processus principal\\Initialisation et nettoyage};
+\node[bloc,below=of main] (ipc) {Ressources partagees\\File System V + memoire partagee};
+\node[petit,below left=13mm and 12mm of ipc] (e1) {Processus ascenseur 1};
+\node[petit,below right=13mm and 12mm of ipc] (e2) {Processus ascenseur 2};
+\node[bloc,below=17mm of ipc] (manager) {Thread gestionnaire\\Priorites, ordonnancement, statistiques};
+\node[petit,below left=12mm and 4mm of manager] (u1) {Threads usagers\\Demandes aleatoires};
+\node[petit,below right=12mm and 4mm of manager] (csv) {Fichier CSV\\Statistiques};
+\draw[fleche] (main) -- (ipc);
+\draw[fleche] (ipc) -- (e1);
+\draw[fleche] (ipc) -- (e2);
+\draw[fleche] (ipc) -- (manager);
+\draw[fleche] (u1) -- node[left,font=\scriptsize]{messages} (manager);
+\draw[fleche] (manager) -- node[left,font=\scriptsize]{commandes / retours} (e1);
+\draw[fleche] (manager) -- node[right,font=\scriptsize]{commandes / retours} (e2);
+\draw[fleche] (manager) -- (csv);
+\end{tikzpicture}
+\caption{Vue logique des processus, threads et communications.}
+\end{figure}
+
+\subsection{Organisation des modules}
+
+\begin{itemize}
+  \item \texttt{main.c} : configuration, creation des ressources, creation des processus et des threads, puis nettoyage.
+  \item \texttt{ascenseur.c} : reception des commandes, deplacement, prise en charge, panne et reprise.
+  \item \texttt{utilisateur.c} : generation concurrente des demandes.
+  \item \texttt{gestionnaire.c} : reception, file d'attente, affectation, gestion des confirmations et collecte des statistiques.
+  \item \texttt{ordonnancement.c} : calcul du cout d'affectation et comparaison des priorites.
+  \item \texttt{communication.c} : encapsulation des appels System V \texttt{msgsnd()} et \texttt{msgrcv()}.
+  \item \texttt{synchronisation.c} : creation de la memoire partagee et des semaphores POSIX partages.
+  \item \texttt{alertes.c}, \texttt{scenario.c}, \texttt{statistiques.c} et \texttt{immeuble.c} : alertes, pannes, export CSV et description des niveaux.
+\end{itemize}
+
+\section{Choix de conception}
+
+\subsection{Processus pour les ascenseurs, threads pour les usagers}
+
+Les ascenseurs sont des processus distincts afin de montrer la creation et la gestion de processus avec \texttt{fork()}. Chaque processus possede sa propre boucle de reception et de deplacement. Les usagers sont representes par des threads car ils partagent les ressources du processus principal et ne necessitent pas un espace d'adressage independant.
+
+Le processus principal cree les deux processus fils avant de lancer les threads. Un thread gestionnaire est ensuite lance en parallele des threads usagers : les demandes peuvent donc etre traitees pendant leur generation, au lieu d'attendre que tous les usagers aient fini.
+
+\subsection{Types de messages separes}
+
+Les messages System V commencent par un champ \texttt{long type}. Le projet reserve des types distincts :
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+\textbf{Type} & \textbf{Sens} & \textbf{Contenu}\\
+\midrule
+1 & Usager vers gestionnaire & Demande d'appel\\
+100 et 101 & Gestionnaire vers ascenseur & Commande de trajet\\
+200 et 201 & Ascenseur vers gestionnaire & Confirmation ou echec\\
+\bottomrule
+\end{tabular}
+\end{center}
+Cette separation evite qu'un processus ascenseur consomme une demande brute destinee au gestionnaire. Elle permet aussi au gestionnaire de recuperer le message de fin correspondant a chaque ascenseur.
+
+\subsection{Heuristique d'affectation}
+
+Le gestionnaire compare les deux ascenseurs pour chaque demande. Un ascenseur hors service est exclu. Pour les autres, le cout estime combine :
+\begin{itemize}
+  \item la distance entre sa position et l'etage de depart de l'appel ;
+  \item une penalite proportionnelle au nombre de commandes deja affectees ;
+  \item si l'ascenseur est deja en mouvement, la distance restante jusqu'a sa destination courante ;
+  \item la distance supplementaire entre cette destination et le nouvel appel ;
+  \item un bonus ou une penalite selon que le sens de deplacement est coherent avec l'appel.
+\end{itemize}
+L'ascenseur dont le cout est le plus faible est selectionne. Cette strategie est une heuristique locale : elle ameliore la decision par rapport a la seule distance, mais ne garantit pas un optimum global. Les commandes affectees a un meme ascenseur sont executees sequentiellement.
+
+\subsection{File d'attente et priorites}
+
+La file d'attente du gestionnaire selectionne d'abord la demande de priorite la plus elevee. Si plusieurs demandes possedent la meme priorite, la plus ancienne est choisie. Les niveaux de priorite sont tires au sort lors de la generation des demandes, avec une proportion plus faible de demandes urgentes.
+
+\section{Concepts de programmation systeme Linux}
+
+\begin{longtable}{p{4.2cm}p{10.2cm}}
+\toprule
+\textbf{Concept} & \textbf{Mise en oeuvre}\\
+\midrule
+\endhead
+Processus -- \texttt{fork()} & Le processus principal cree deux fils. Chaque fils execute \texttt{processus\_ascenseur()} et termine avec \texttt{\_exit()}.\\
+Threads -- pthreads & \texttt{pthread\_create()} lance un thread gestionnaire et les threads usagers. \texttt{pthread\_join()} attend leur fin avant le nettoyage.\\
+Files de messages System V & \texttt{msgget()}, \texttt{msgsnd()}, \texttt{msgrcv()} et \texttt{msgctl()} assurent le transport des appels, commandes et confirmations.\\
+Memoire partagee System V & \texttt{shmget()} et \texttt{shmat()} creent une zone contenant la position, la direction, la destination, l'occupation et l'etat de panne des ascenseurs.\\
+Semaphores POSIX partages & \texttt{sem\_init()} initialise les semaphores avec \texttt{pshared = 1}. Ils protegent l'etat partage et reveillent le gestionnaire lors des nouveaux appels, fins de trajet et pannes.\\
+Mutex pthread & Deux mutex protegent la generation aleatoire et les compteurs, qui sont partages uniquement entre les threads du processus principal.\\
+Signaux & Le processus principal et les ascenseurs installent des gestionnaires pour \texttt{SIGINT} et \texttt{SIGTERM}. Le programme organise ensuite l'arret des fils et la liberation des ressources.\\
+Fichiers & Les statistiques sont enregistrees dans un fichier CSV afin de pouvoir etre analysees apres la simulation.\\
+\bottomrule
+\end{longtable}
+
+Les semaphores sont initialises dans la memoire partagee avant le \texttt{fork()}. Leur parametre \texttt{pshared} vaut 1 : ils sont donc utilisables par les processus ascenseurs et le processus principal.
+
+\section{Deroulement d'une simulation}
+
+\begin{enumerate}
+  \item Le programme lit les options de lancement et cree le dossier de resultats.
+  \item Il cree une file de messages System V et une zone de memoire partagee contenant les etats initiaux des deux ascenseurs.
+  \item Il cree les deux processus ascenseurs avec \texttt{fork()}.
+  \item Il lance le thread gestionnaire, puis cree progressivement les threads usagers. Chaque thread genere un depart, une destination et une priorite, puis envoie une demande.
+  \item Le gestionnaire collecte les demandes, les trie par priorite et choisit un ascenseur selon le cout estime. Il peut affecter une demande a un ascenseur qui a deja des commandes en attente.
+  \item L'ascenseur rejoint l'etage de depart, signale la prise en charge, puis se rend a l'etage de destination. Il renvoie une confirmation.
+  \item En cas de panne simulee avant le trajet, l'ascenseur envoie un message d'echec. Le gestionnaire remet la demande dans la file ; l'ascenseur est temporairement indisponible puis revient en service apres la reparation simulee.
+  \item Lorsque toutes les demandes ont ete servies, le processus principal envoie un ordre d'arret aux fils, attend leur terminaison et supprime la file de messages et la memoire partagee.
+\end{enumerate}
+
+\section{Tests et resultats}
+
+La compilation utilise GCC avec les options de controle \texttt{-Wall}, \texttt{-Wextra} et \texttt{-Wpedantic}. Les validations presentees ci-dessous sont des executions manuelles realisees sous Linux/WSL.\par
+
+\subsection{Validation manuelle avec panne}
+
+Le test d'integration lance la commande suivante :
+\begin{lstlisting}[style=terminal]
+./gestion-ascenseurs -n 10 -s 4242 -d 1 -p 100 -r 10
+\end{lstlisting}
+Cette configuration augmente la probabilite d'apparition d'une panne. Elle permet de verifier qu'une demande interrompue est remise en attente puis terminee apres la reparation. Les durees et la repartition des demandes varient selon l'execution ; elles doivent etre relevees dans les captures produites par le groupe.
+\begin{figure}[ht]
+\centering
+\fbox{\parbox[c][5cm][c]{0.82\textwidth}{\centering
+\textbf{Capture a inserer : execution automatique avec une panne,\newline reaffectation de la demande et bilan final.}}}
+\caption{Exemple d'execution automatique a remplacer par une capture du groupe.}
+\end{figure}
+
+\subsection{Exemple de sortie terminal}
+
+\begin{figure}[ht]
+\centering
+\fbox{\parbox[c][5cm][c]{0.82\textwidth}{\centering
+\textbf{Capture a inserer : console interactive, commande \texttt{etat}\newline et creation d'un appel prioritaire.}}}
+\caption{Exemple de mode interactif a remplacer par une capture du groupe.}
+\end{figure}
+
+Le dossier \texttt{resultats/} contient un fichier CSV distinct par execution. Chaque fichier enregistre l'identifiant, la priorite, l'ascenseur choisi, les etages de depart et d'arrivee, l'attente avant prise en charge, la duree totale et le nombre de tentatives.
+
+\begin{figure}[ht]
+\centering
+\fbox{\parbox[c][4cm][c]{0.82\textwidth}{\centering
+\textbf{Capture a inserer : contenu d'un fichier CSV dans \texttt{resultats/}.}}}
+\caption{Export des statistiques de simulation.}
+\end{figure}
+
+\section{Difficultes rencontrees et solutions}
+
+\begin{itemize}
+  \item \textbf{Confusion possible entre les messages :} les appels et les commandes du premier ascenseur utilisaient initialement un type de message qui pouvait se chevaucher. Des plages de types distinctes ont ete reservees pour les demandes, les commandes et les retours.
+  \item \textbf{Acces concurrents a l'etat des ascenseurs :} plusieurs processus consultent ou modifient les positions et etats. La zone de memoire partagee est maintenant protegee par un mutex partage entre processus.
+  \item \textbf{Reveil du gestionnaire :} une interrogation continue de la file aurait genere une boucle d'attente active. Le semaphore permet de reveiller le gestionnaire lors d'un nouvel evenement, avec une attente bornee pour traiter egalement les confirmations.
+  \item \textbf{Panne et perte d'une demande :} une panne ne doit pas faire disparaitre l'appel. L'ascenseur transmet un statut d'echec, puis le gestionnaire reintegre la demande dans la file avant de tenter une nouvelle affectation.
+  \item \textbf{Ordre des traces :} la sortie standard est configuree en mode ligne afin de conserver des traces lisibles lorsque la sortie du programme est redirigee vers un fichier.
+\end{itemize}
+
+\section{Limites et ameliorations possibles}
+
+Le projet est une simulation pedagogique, et non un logiciel de commande d'un equipement reel. Plusieurs simplifications sont assumees :
+\begin{itemize}
+  \item les commandes d'un ascenseur sont traitees sequentiellement ; le programme ne construit pas un itineraire multi-arrets commun a plusieurs passagers ;
+  \item l'algorithme d'affectation est une heuristique locale et non un solveur d'optimisation globale ;
+  \item une panne automatique est limitee a un scenario par execution ; le mode interactif permet de provoquer des pannes manuelles ;
+  \item la capacite represente le nombre maximal de demandes affectees a un ascenseur, et non un nombre physique de passagers ;
+  \item l'interface reste textuelle et ne propose pas de representation graphique de l'immeuble.
+\end{itemize}
+
+Des evolutions possibles seraient l'ajout de plusieurs arrets par trajet, d'une capacite physique avec surcharge, de scenarios horaires plus riches, de pannes pendant un trajet et d'une analyse graphique du CSV.
+
+\section{Conclusion}
+
+Ce projet met en oeuvre une simulation concurrente de deux ascenseurs en langage C sous Linux. Il mobilise les processus, les threads, les files de messages System V, la memoire partagee, des semaphores POSIX partages, des mutex entre threads, les signaux et l'enregistrement de fichiers. La gestion des priorites, la prise en compte de la direction et de la charge, les pannes simulees, le mode interactif et les statistiques apportent un niveau fonctionnel allant au-dela d'un simple deplacement aleatoire.
+
+Les executions manuelles permettent de verifier la compilation, les appels automatiques et interactifs, les pannes, les reparations, les priorites et l'export CSV. Le groupe doit personnaliser la page de garde, inserer ses propres captures et etre en mesure d'expliquer les choix techniques presentes dans ce rapport.
+
+\appendix
+\section{Compilation et execution}
+\begin{lstlisting}[style=terminal]
+make
+make run
+make help
+./gestion-ascenseurs -h
+./gestion-ascenseurs -n 20 -s 42 -d 1
+./gestion-ascenseurs -n 20 -s 42 -d 1 -p 15 -r 10
+./gestion-ascenseurs -i -n 5 -d 0 -p 0
+\end{lstlisting}
+
+
+\end{document}
